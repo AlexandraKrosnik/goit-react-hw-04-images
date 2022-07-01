@@ -1,4 +1,5 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
+import { useFirstMountState } from 'react-use';
 import { Searchbar } from './Searchbar/Searchbar';
 import * as API from '../data/API';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -6,80 +7,67 @@ import { Loader } from './Loader/Loader';
 import { Button } from './Button/Button';
 import 'react-loader-spinner/dist/loader/css/react-spinner-loader.css';
 
-export class App extends Component {
-  state = {
-    images: [],
-    page: 1,
-    error: '',
-    isLoading: false,
-    value: '',
-    loadMore: false,
-  };
+export const App = () => {
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [value, setValue] = useState('');
+  const [loadMore, setLoadMore] = useState(false);
+  const [totalImages, setTotalImages] = useState(0);
 
-  componentDidUpdate(_, prevState) {
-    const { images, page, value } = this.state;
-    if (prevState.page !== page || prevState.value !== value) {
-      this.setState({
-        isLoading: true,
-        loadMore: false,
-      });
+  const isFirstMount = useFirstMountState();
+
+  useEffect(() => {
+    function fetchImages() {
+      setIsLoading(true);
+      setLoadMore(false);
       API.fetchImagesByQuery(value.replace(' ', '+'), page)
-        .then(({ total, images }) => {
+        .then(({ total, images: imagesArr }) => {
           if (total === 0) {
-            this.setState({
-              error: `По запиту ${value} світлин не знайдено!`,
-              images: [],
-            });
+            setError(`По запиту ${value} світлин не знайдено!`);
+            setImages([]);
           } else {
-            this.setState(prevState => ({
-              error: false,
-              loadMore: !!(prevState.images.length + images.length !== total),
-              images: [...prevState.images, ...images],
-            }));
+            setError(false);
+            setTotalImages(total);
+            setImages(prevImages => [...prevImages, ...imagesArr]);
           }
         })
         .catch(error => {
           if (!error) {
-            this.setState({
-              error: 'Щось пішло не так! Перевірте введені дані.',
-              loadMore: false,
-            });
+            setError('Щось пішло не так! Перевірте введені дані.');
+            setLoadMore(false);
           }
         })
         .finally(() => {
-          this.setState({
-            isLoading: false,
-          });
+          setIsLoading(false);
         });
     }
-
-    if (images.length !== prevState.images.length) {
-      this.scrollSmothly(
-        this.setState({
-          isLoading: false,
-        })
-      );
+    if (isFirstMount) {
+      return;
     }
-  }
+    fetchImages();
+  }, [page, value, isFirstMount]);
 
-  getDataOnRequest = query => {
-    if (query !== this.state.value) {
-      this.setState({
-        value: query,
-        page: 1,
-        images: [],
-      });
+  useEffect(() => {
+    scrollSmothly();
+    setIsLoading(false);
+    setLoadMore(images.length !== totalImages);
+  }, [images, totalImages]);
+
+  const getDataOnRequest = query => {
+    if (query !== value) {
+      setValue(query);
+      setPage(1);
+      setImages([]);
     }
   };
 
-  loadMoreImages = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+  const loadMoreImages = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  renderBody = () => {
-    const { error, images } = this.state;
+  const renderBody = () => {
     if (!!error) {
       return <p>{error}</p>;
     }
@@ -88,21 +76,19 @@ export class App extends Component {
     }
   };
 
-  scrollSmothly = () => {
+  const scrollSmothly = () => {
     window.scrollBy({
       top: document.body.clientHeight,
       behavior: 'smooth',
     });
   };
 
-  render() {
-    return (
-      <>
-        <Searchbar onSubmit={this.getDataOnRequest} />
-        {this.renderBody()}
-        {this.state.isLoading && <Loader />}
-        {this.state.loadMore && <Button onLoadMore={this.loadMoreImages} />}
-      </>
-    );
-  }
-}
+  return (
+    <>
+      <Searchbar onSubmit={getDataOnRequest} />
+      {renderBody()}
+      {isLoading && <Loader />}
+      {loadMore && <Button onLoadMore={loadMoreImages} />}
+    </>
+  );
+};
