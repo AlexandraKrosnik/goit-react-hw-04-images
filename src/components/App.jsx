@@ -52,7 +52,7 @@ export const App = () => {
   useEffect(() => {
     scrollSmothly();
     setIsLoading(false);
-    setLoadMore(images.length !== totalImages);
+    setLoadMore(images.length !== 0 && images.length !== totalImages);
   }, [images, totalImages]);
 
   const getDataOnRequest = query => {
